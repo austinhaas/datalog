@@ -4,6 +4,8 @@ A simple, unoptimized, purely functional Datalog implementation, inspired by min
 
 Includes naive, semi-naive, and backward-chaining implementations.
 
+This implementation was originally created to accompany a presentation I gave about Datalog at the Clojure PDX meetup on March 1st, 2018. The slides from that presentation are in the doc directory [here](./doc/datalog-presentation.org).
+
 ## References
 
 Ceri, Stefano, Georg Gottlob, and Letizia Tanca. "What you always wanted to know about Datalog (and never dared to ask)." IEEE transactions on knowledge and data engineering 1.1 (1989): 146-166.
