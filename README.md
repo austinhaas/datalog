@@ -40,7 +40,7 @@ Example:
 
 ## Usage
 
-See datalog_test.clj.
+See [datalog_test.clj](./test/pettomato/datalog_test.clj).
 
 ## License
 
