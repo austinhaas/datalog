@@ -1,0 +1,472 @@
+#+TITLE: Datalog
+
+* Datalog
+** Intro
+*** Outline
+    - ( 3 min) Intro
+    - (12 min) Datalog intro / theory
+    - (30 min) Datalog in Clojure
+    - (10 min) Datalog at HealthSparq
+    - ( 2 min) Datalog in Simulation
+    - ( 2 min) Datalog in Datomic
+    - ( 5 min) Summary / Conclusion
+*** Main takeaway
+
+    An appreciation for Logic Programming.
+
+      (Represented here, by Datalog.)
+
+** Datalog intro / theory
+*** What is Datalog?
+    - Query language (like SQL)
+      - Datalog: formal logic.
+            SQL: relational model.
+    - Rule-based language.
+    - A simplified version of general Logic Programming.
+    - Invented to combine Logic Programming (or AI) with database
+      technology.
+      - ACID properties
+      - Datalog can be used to query a relational database.
+    - ~40 years old.
+    - No single inventor.
+      - "Datalog" was coined by David Maier (PSU).
+
+*** Why be interested in Datalog?
+    * powerful
+    * general
+    - Easy to learn.
+    - Easy to implement.
+    * Mentally stimulating.
+    - Intro to Logic Programming.
+    * declarative (what, not how)
+    * expressive (many types of relationships can be defined)
+    - It is very well understood.
+    * Abundant literature available.
+      - 45,500 results for Datalog on Google Scholar.
+      - Several survey papers.
+      - Several textbooks with chapters on Datalog can be found
+        online.
+      - New papers being published regularly.
+        - Maybe a paper every couple months.
+    - It is the query system employed by Datomic.
+*** What can Datalog be used for?
+    - Database query systems
+    - Production rule systems
+*** Syntax
+**** Fact (atom)
+
+     A
+
+     IS-RAINING
+**** Rule
+
+       A → B
+
+       A ∧ B → C
+
+       A ∧ B ∧ C → D
+
+       IS-RAINING ∧ WEEKDAY → TAKE-UMBRELLA
+       --------------------   -------------
+               body               head
+
+
+     - Rules specify how to generate new facts from existing facts.
+       - This is called "deduction".
+
+     - At least one atom in the body.
+     - Exactly one atom in the head.
+**** Program
+
+     A Datalog program is a set of rules.
+**** Semantics
+
+     Semantics in Clojure:
+
+       - function application
+       - maps are functions
+       - sets vs. vectors
+
+     Semantics in Datalog:
+
+       - simple
+       - only facts and rules
+       - very simple inference mechanism
+
+     Semantics: the meaning of a Datalog program.
+
+     A tool for working with Datalog on the theoretical level.
+
+     Three different, but equivalent, semantics:
+
+       - Fixpoint
+       - Operational
+       - Model-theoretic
+
+     The important thing is that Datalog is defined by its semantics,
+     not (necessarily) an algorithm.
+
+     You can't evaluate some rules and not others.
+
+**** Evaluation
+
+     Combine a set of rules with a database of facts.
+
+***** Rule dependency graph
+
+         A ∧ B → C
+
+             C → D
+
+
+            D
+            |
+            C
+           / \
+          A   B
+***** Bottom Up / Forward Chaining
+
+      Start with all facts.
+
+      Find all rules that can "fire".
+
+      Use the rules to generate new facts.
+
+      Add the new facts to the database.
+
+      Repeat until no new facts are deduced.
+
+      Generates all facts!
+****** Example
+
+               Database: A B
+                  Rules: A ∧ B → C
+                             C → D
+
+  Step 1       Database: A B
+          Matched Rules: A ∧ B → C
+          Add C to Database.
+
+  Step 2       Database: A B C
+          Matched Rules: A ∧ B → C
+                             C → D
+          Add C and D to Database.
+
+  Step 3       Database: A B C D
+          Matched Rules: A ∧ B → C
+                             C → D
+          Add C and D to Database.
+          FIXPOINT: Database did not change.
+          There are no more new facts to infer.
+
+***** Top Down / Backward Chaining
+
+      Work backwards from a "query", which is a conjunction of
+      atoms. Find facts and rules that can support the query. Rules
+      will generate "subqueries", which will be recursively processed.
+
+      Start with a query (a conjunction of atoms).
+      While there are atoms in the query,
+
+        Take the first atom from the query.
+
+        If the atom matches a fact in the database,
+        remove the atom from the query.
+
+        If the atom matches the head of a rule, remove the atom from
+        the query, and add the body of the rule to the query.
+
+        If the atom does not match a fact or a rule, fail.
+
+      Only searches the space of facts relevant to the query.
+****** Example
+
+       Database: A B
+          Rules: A ∧ B → C
+                     C → D
+
+          Query: D
+
+  Step 1  Query: D
+          D resolves with rule C → D.
+          Remove D from Query.
+          Add C to Query.
+
+  Step 2  Query: C
+          C resolves with rule A ∧ B → C
+          Remove C from Query.
+          Add A ∧ B to Query.
+
+  Step 3  Query: A ∧ B
+          A resolves with fact A.
+          Remove A from Query.
+
+  Step 4  Query: B
+          B resolves with fact B.
+          Remove B from Query.
+
+  Step 5  Query:
+          Done! Query has been satisfied.
+** Datalog in Clojure
+*** Fact (atom)
+
+    Entity Attribute Value
+
+    [Zeus  :gender   male]
+    [Zeus  :father   Cronus]
+    [Zeus  :mother   Rhea]
+
+    Datomic calls these datoms.
+*** Rules
+
+    Rules are written as a vector. The first element is the head and
+    the rest are the body.
+
+    [[Zeus :at-risk-for-prostate-cancer true]  ;; head
+
+     [Zeus :gender male]                       ;; body
+     [Zeus :senior true]]                      ;; body
+
+*** Variables
+
+    Symbols that start with '?'.
+
+    [Zeus :father ?x]
+
+    Same in Datomic.
+
+*** Implementation
+
+    See code.
+** Datalog at HealthSparq
+*** HealthSparq
+
+  "Helping people make smarter health care choices."
+
+  Saas platform for insurance providers to talk to their members.
+
+  Doctor finder.
+*** Provider Data Pipeline
+    - Our customers are health insurance companies.
+    - Data about healthcare providers:
+      - Where are they located?
+      - Are they accepting new patients?
+      - Is the location wheelchair accessible?
+      - What networks are they in?
+      - Which hospitals are they affiliated with?
+    - Periodically receive tens of GB of data in 10-20 files.
+    - Each file is basically a database table.
+    - Each file may be different.
+      - format
+      - schema
+    - There are interdependencies between the tables.
+      - joins, relationally speaking
+*** Problem
+  - Basic problem: transform the data into a searchable structure.
+    - We get the data in one format, which may be unique to the
+      customer, and we transform the data into a standard format used
+      internally.
+  - Batch process.
+  - The transformations are arbitrary.
+  - Other important problems:
+    - The time it takes to onboard a new customer.
+      - Communication (and agreement) with customer and communication
+        internally.
+    - Triaging/resolving mistakes.
+    - Turnaround after receiving new data.
+*** Implementation
+**** Datalog
+
+  Nonrecursive Datalog w/ built-in predicates, and aggregate and
+  scalar functions.
+**** Runs on Apache Beam / Google Dataflow.
+
+  - Distributed computing platform.
+  - Batch or stream processing.
+    - Several windowing strategies for streaming.
+  - Originally a Google project.
+  - Now an open source Apache project.
+  - Beam is the software library.
+  - Dataflow is the execution platform (or "runner").
+  - Can run locally.
+  - Java (or Python) library.
+  - PCollection: represents a possibly infinite stream of data.
+  - Core Beam transforms:
+    - ParDo
+    - GroupByKey
+    - CoGroupByKey
+    - Combine
+    - Flatten
+    - Partition
+**** Datalog syntax
+***** Facts
+
+  - Based on relations.
+
+  [:provider {:first-name ?fn
+              :last-name  ?ln
+              :city       "Portland"}]
+
+***** Rules
+
+  - Built-in predicates
+  - Functions
+  - Disjunction
+
+**** Datalog implementation
+
+  Datalog > Relational Algebra > SQL > Apache Beam (SQL extension)
+
+  Completely different from the Clojure implementation I just showed.
+  But it's still Datalog!
+
+
+**** How does this solve the problem I stated?
+
+   - User doesn't need to understand Clojure.
+     - Simple DSL.
+     - Declarative: no if/then, loops, or state.
+     - Rule order doesn't matter.
+   - Each rule can be developed, tested, and communicated
+     independently.
+   - Rules are in data files.
+   - The size of the rules is small.
+   - It is fast.
+
+** Datalog in simulation
+
+   - Personal project: A simulation system based on logic and
+     autonomous behavior.
+
+   - Using Datalog for the database that agents (autonomous actors)
+     use to query the state of the world.
+     - Using Datomic w/ a shim.
+     - EAV, because it is easy to identify what is being updated.
+
+   - Agents receive:
+     - Initial state (only base facts).
+     - Rules.
+     - State updates (only base facts).
+     - Actions.
+
+   - Agents can use rules and actions to make inferences.
+     - Facts and rules are two different types of knowledge.
+
+**** Action
+
+  {:name move
+   :vars [r d d']
+   :pre  [[d  :adj/to       d']
+          [r  :robot/loc    d]
+          [d' :loc/occupied false]]
+   :eff  [[r  :robot/loc    d']
+          [d  :loc/occupied false]
+          [d' :loc/occupied true]]}
+
+  Planning: Synthesizing a sequence of actions to achieve a goal.
+
+** Datalog in Datomic
+*** Rules
+    - Not prominent.
+      - Bottom of documentation on querying.
+
+      - "Datomic datalog allows you to package up sets of :where
+        clauses into named rules. These rules make query logic
+        reusable, and also composable..."
+
+    - But they're there, and they make sense in the context of how
+      Datomic uses Datalog (i.e., for ad-hoc queries).
+**** Example
+
+    Datalog (our version):
+
+    [[?x :at-risk-for-prostate-cancer true]
+     [?x :gender male]
+     [?x :senior true]]
+
+    Datomic:
+
+    [(at-risk-for-prostate-cancer ?x)
+     [?x :gender male]
+     [?x :senior true]]
+
+    - Rules are supplied with each query.
+    - Rules don't add new facts to the database.
+      - Normal with top-down, but I want to point out how "deducing
+        new facts from existing facts" isn't a concept in Datomic.
+*** Built-in predicates
+
+    - Call Clojure.
+*** Rich query grammar
+
+    - Negation, disjunction, etc.
+*** Additional features
+
+    - ACID
+    - Temporal
+** Conclusion
+*** What is Logic Programming?
+    - A programming paradigm based on formal logic.
+    - Largely declarative.
+      - A program expresses what, not how.
+    - Prolog, miniKanren, core.logic
+**** Datalog vs. General Logic Programming
+     - Datalog is GLP without function symbols.
+       - (inc ?x) ← ?x
+     - Datalog is not Turing complete.
+     - Datalog is tractable (the set of facts that can be generated is
+       finite).
+*** Why be interested in Logic Programming?
+    - Expressive power.
+    - Logic is interesting. It has a long history.
+      - Formal logic systems have existed for a long time and they are
+        well understood and there are many techniques and algorithms
+        for working with logic.
+    - Exciting application domains:
+      - AI
+      - automated reasoning
+      - robots
+      - web crawlers
+    - Beautiful, and mentally stimulating, algorithms:
+      - search
+      - recursion
+      - syntactical transformations
+      - control-flow paradigms
+      - Interpreters.
+        - Manipulating syntactic elements is what Lisp was made for.
+          - McCarthy: Lisp, AI
+    - Bleeding edge of what is computable.
+      - NP-hard problems
+        - heuristics
+    - It might make you a better programmer.
+*** Logic Programming vs. Functional Programming
+
+    - FP: immutable data, referential transparency (no side effects!)
+    - LP: No state or control flow.
+
+*** To find out more about Datalog:
+
+  Surveys:
+
+    "What you always wanted to know about Datalog (and never dared to ask)."
+    Ceri, Stefano, Georg Gottlob, and Letizia Tanca.
+
+    "Datalog and recursive query processing."
+    Green, Todd J., et al.
+
+  Books:
+
+    "Foundations of databases."
+    Abiteboul, Serge, Richard Hull, and Victor Vianu.
+
+    "Principles of Database and Knowledge—Base Systems, Volume I."
+    Ullman, Jeffrey D.
+*** To find out more about Logic Programming:
+
+    - miniKanren
+      - https://www.amazon.com/Reasoned-Schemer-MIT-Press/dp/0262535513
+      - μKanren
+
+    - core.logic
+
+*** Thank You
