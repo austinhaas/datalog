@@ -267,7 +267,7 @@
 (defn bc-query
   "Backwards-chaining query."
   [db rule* goal*]
-  ;; Depth-first search.
+  ;; Breadth-first search.
   (loop [open [[empty-s goal*]]
          s*   []]
     (if (empty? open)
@@ -291,7 +291,7 @@
                 ;; Resolve goal with rules.
                 open2 (keep (fn [[head & body]]
                               (when-let [s' (unify-eav s goal head)]
-                                [s' (concat body (rest goal*))]))
+                                [s' (concat (rest goal*) body)]))
                             (map standardize-apart rule*))]
-            (recur (concat open1 open2 (rest open))
+            (recur (concat (rest open) open1 open2)
                    s*)))))))
